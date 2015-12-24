@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import re
+import math
 import logging
 import json
 from datetime import datetime, timedelta
@@ -449,6 +450,14 @@ class User(Base):
                     and (req.status in valid_status)
                     and (req.date_from.year == year)])
 
+    def get_cp_taken_year(self, session, date):
+        """ Retrieve taken CP for a user for current year """
+        valid_status = ['PENDING', 'ACCEPTED_MANAGER', 'APPROVED_ADMIN']
+        return sum([req.days for req in self.requests
+                    if (req.vacation_type.name == u'CP')
+                    and (req.status in valid_status)
+                    and (req.date_from >= date)])
+
     def get_rtt_usage(self, session):
         """ Get RTT usage for a user """
         allowed = VacationType.by_name_country(session, name=u'RTT',
@@ -472,6 +481,7 @@ class User(Base):
                'year': current_year, 'state': state}
         return ret
 
+<<<<<<< 5282501662dcbe2d64281e17c26d41313a93c664
     @classmethod
     def get_rtt_acquired_history(cls, session, user, year):
         """ Get RTT acquired history """
@@ -508,6 +518,37 @@ class User(Base):
         history = sorted(acquired + taken)
 
         return history
+
+    def get_cp_usage(self, session):
+        """ Get CP usage for a user """
+        allowed = VacationType.by_name_country(session, name=u'CP',
+                                               country=self.country,
+                                               user=self)
+        if allowed is None:
+            return
+
+        starting_date = CPVacation.get_starting_date()
+        print 'starting_date', starting_date
+        taken = self.get_cp_taken_year(session, starting_date)
+
+        # first remove taken CP from Restant pool then from Acquis pool
+        exceed = 0
+        left_restant = allowed['restant'] - taken
+        if left_restant < 0:
+            exceed = abs(left_restant)
+            left_restant = 0
+        left_acquis = allowed['acquis'] - exceed
+
+        # must handle 2 pools: acquis and restant
+        ret_acquis = {'allowed': allowed['acquis'],
+                      'left': left_acquis,
+                      'year': starting_date.year + 2}
+        ret_restant = {'allowed': allowed['restant'],
+                       'left': left_restant,
+                       'year': starting_date.year + 1}
+        return {'acquis': ret_acquis, 'restant': ret_restant,
+                'taken': taken}
+
 
 
 vacation_type__country = Table('vacation_type__country', Base.metadata,
@@ -563,6 +604,47 @@ class RTTVacation(BaseVacation):
 
         return len([i for i in xrange(start_month, today.month + 1)
                     if i not in except_months])
+
+
+class CPVacation(BaseVacation):
+
+    name = u'CP'
+
+    @classmethod
+    def get_starting_date(cls, today=None):
+        """ """
+        today = today or datetime.now()
+        current_year = today.year
+
+        if today >= datetime(current_year, 6, 1):
+            starting_date = datetime(current_year, 6, 1)
+        else:
+            starting_date = datetime(current_year - 1, 6, 1)
+
+        return starting_date
+
+    @classmethod
+    def acquired(cls, **kwargs):
+        """ Return acquired vacation this year to current day.
+
+        We acquire 25 CP per year. A year period is not a normal year but
+        from 01/06/year to 31/05/year+1
+        """
+        today = datetime.now()
+        starting_date = cls.get_starting_date(today)
+
+        today_start_month = today.replace(day=1)
+        months = abs(relativedelta(starting_date, today_start_month).months)
+
+        # TODO take acount of employee starting date here
+        # use LDAP field arrivalDate
+        # arrivalDate format GeneralizedTime LDAP 1.3.6.1.4.1.1466.115.121.1.24
+        # example: 199412161032Z
+        #  yyyyMMddHHmmss
+
+        acquis = (months * 2.08)
+        restant = 23.5
+        return {'acquis': acquis, 'restant': restant}
 
 
 class VacationType(Base):

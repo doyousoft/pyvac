@@ -110,6 +110,8 @@
     <legend>Informations</legend>
     <ul>
         <li>You have <span class="text-{{pyvac.user.rtt['state']}}"><b>{{pyvac.user.rtt['left']}} RTT</b></span> to use before end of year {{pyvac.user.rtt['year']}}</li>
+        <li>You have <b>{{pyvac.user.cp['restant']['left']}} CP Restant</b> to use before 31/05/{{pyvac.user.cp['restant']['year']}}</li>
+        <li>You have <b>{{pyvac.user.cp['acquis']['left']}} CP Acquis</b> to use before 31/05/{{pyvac.user.cp['acquis']['year']}}</li>
     </ul>
 </div>
 {% endif %}
