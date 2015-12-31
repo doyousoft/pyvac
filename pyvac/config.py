@@ -162,6 +162,13 @@ def includeme(config):
                     renderer='json',
                     permission=u'user_view')
 
+    config.add_route('request_history', u'/pyvac/request_history/{req_id}',
+                     request_method=u'GET')
+    config.add_view(u'pyvac.views.request.History',
+                    route_name=u'request_history',
+                    renderer=u'templates/request/history.html',
+                    permission=u'user_view')
+
     # Admin  view
     config.add_route(u'list_account', u'/pyvac/account')
     config.add_view(u'pyvac.views.account.List',
