@@ -1,3 +1,31 @@
+pyvac (1.7.0-10) unstable; urgency=medium
+
+  * When requesting a Recovery vacation, user can now provide a reason
+    using the same field as Exception vacation.
+
+ -- Dejan Filipovic <sayoun@gandi.net>  Mon, 04 Jan 2016 10:01:05 +0100
+
+pyvac (1.7.0-9) unstable; urgency=medium
+
+  * Update /off view for nick filtering
+    - Check if provided nick exists if not return 404
+    - Can disable partial nickname search if strict parameter is provided
+
+ -- Dejan Filipovic <sayoun@gandi.net>  Thu, 31 Dec 2015 12:07:10 +0100
+
+pyvac (1.7.0-8) unstable; urgency=medium
+
+  * Add pool feature to requests.
+    - Request now store pool status for RTT vacation type upon creation
+    - Request list view now display Request pool Left number value when available
+  * Update request list view:
+    - Remove notified column
+    - Use smaller button size for action
+    - Fixe <pre> content to remove unwanted whitespaces
+    - Exceptionnal message should appear in past table
+
+ -- Dejan Filipovic <sayoun@gandi.net>  Thu, 31 Dec 2015 09:57:16 +0100
+
 pyvac (1.7.0-7) unstable; urgency=medium
 
   * Fixes zh holidays list for 2016

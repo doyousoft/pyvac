@@ -421,6 +421,15 @@ class User(Base):
         return self._country.name
 
     @classmethod
+    def get_all_nicknames(cls, session):
+        """
+        Retrieve all distinct available nicknames (uid field)
+        """
+        return [nick[0]
+                for nick in session.query(User.uid).distinct().all()
+                if nick[0]]
+
+    @classmethod
     def for_admin(cls, session, admin):
         """
         Get all users for an admin regarding his country
@@ -815,10 +824,9 @@ class Request(Base):
         from calendar import monthrange
 
         date = datetime.now()
-        date = date.replace(month=month, year=year)
         # retrieve first day of the previous month
         # first_month_day = date.replace(day=1) - relativedelta(months=1)
-        first_month_day = date.replace(day=1)
+        first_month_day = date.replace(day=1, month=month, year=year)
         # set date at 00:00:00
         first_month_date = first_month_day.replace(hour=0, minute=0, second=0,
                                                    microsecond=0)
