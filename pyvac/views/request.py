@@ -170,9 +170,7 @@ class Send(View):
 
             # save pool status when making the request
             if pool:
-                pool_status = json.dumps(pool)
-            else:
-                pool_status = json.dumps({})
+                pool = json.dumps(pool)
 
             request = Request(date_from=date_from,
                               date_to=date_to,
@@ -183,7 +181,7 @@ class Send(View):
                               notified=target_notified,
                               label=label,
                               message=message,
-                              pool_status=pool_status,
+                              pool_status=pool,
                               )
             self.session.add(request)
             self.session.flush()
