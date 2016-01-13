@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import re
-import math
 import logging
 import json
 from datetime import datetime, timedelta
@@ -481,7 +480,6 @@ class User(Base):
                'year': current_year, 'state': state}
         return ret
 
-<<<<<<< 5282501662dcbe2d64281e17c26d41313a93c664
     @classmethod
     def get_rtt_acquired_history(cls, session, user, year):
         """ Get RTT acquired history """
@@ -548,7 +546,6 @@ class User(Base):
                        'year': starting_date.year + 1}
         return {'acquis': ret_acquis, 'restant': ret_restant,
                 'taken': taken}
-
 
 
 vacation_type__country = Table('vacation_type__country', Base.metadata,
