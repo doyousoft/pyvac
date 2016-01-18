@@ -3,6 +3,7 @@
 import re
 import logging
 import json
+import math
 from datetime import datetime, timedelta
 
 from dateutil.relativedelta import relativedelta
@@ -185,6 +186,45 @@ class User(Base):
             ldap = LdapCache()
             user_data = ldap.search_user_by_dn(self.manager_dn)
             return user_data['login']
+
+    @property
+    def arrival_date(self):
+        """ Get arrival date in the company for a user """
+        if not self.ldap_user:
+            return
+
+        ldap = LdapCache()
+        user_data = ldap.search_user_by_dn(self.dn)
+        return user_data['arrivalDate']
+
+    @property
+    def seniority(self):
+        """ Return how many years the user has been employed """
+        arrival_date = self.arrival_date
+        if not arrival_date:
+            return 0
+
+        today = datetime.now()
+        nb_year = today.year - arrival_date.year
+        current_arrival_date = arrival_date.replace(year=today.year)
+        if today < current_arrival_date:
+            nb_year = nb_year - 1
+
+        return nb_year
+
+    @property
+    def anniversary(self):
+        """ Return how many days left until next anniversary """
+
+        arrival_date = self.arrival_date
+        if not arrival_date:
+            return (False, 0)
+
+        today = datetime.now()
+        current_arrival_date = arrival_date.replace(year=today.year)
+        delta = (today - current_arrival_date).days
+
+        return (True if delta == 0 else False, abs(delta))
 
     @classmethod
     def by_login(cls, session, login):
@@ -624,8 +664,8 @@ class CPVacation(BaseVacation):
     def acquired(cls, **kwargs):
         """ Return acquired vacation this year to current day.
 
-        We acquire 25 CP per year. A year period is not a normal year but
-        from 01/06/year to 31/05/year+1
+        We acquire a base of 25 CP per year.
+        A year period is not a normal year but from 01/06/year to 31/05/year+1
         """
         today = datetime.now()
         starting_date = cls.get_starting_date(today)
@@ -633,13 +673,18 @@ class CPVacation(BaseVacation):
         today_start_month = today.replace(day=1)
         months = abs(relativedelta(starting_date, today_start_month).months)
 
-        # TODO take acount of employee starting date here
-        # use LDAP field arrivalDate
-        # arrivalDate format GeneralizedTime LDAP 1.3.6.1.4.1.1466.115.121.1.24
-        # example: 199412161032Z
-        #  yyyyMMddHHmmss
+        cp_bonus = 0
+        user = kwargs.get('user')
+        if user:
+            # add bonus CP based on arrival_date, 1 more per year each 5 years
+            cp_bonus = int(math.floor(user.seniority / 5))
 
-        acquis = (months * 2.08)
+        # coeff should be 2.08 per month until the 5th year
+        # we use only 2 first decimals.
+        coeff = float("{0:.2f}".format((25 + cp_bonus) / 12.))
+        # use a new conf or field for starting acquis/restant value based on a
+        # configuration file
+        acquis = (months * coeff)
         restant = 23.5
         return {'acquis': acquis, 'restant': restant}
 
