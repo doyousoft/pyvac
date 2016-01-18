@@ -109,6 +109,7 @@
 <div class="span5">
     <legend>Informations</legend>
     <ul>
+        <li><b>{{ pyvac.user.anniversary[1] }}</b> days until your {{ (pyvac.user.seniority + 1)|english_suffix}} anniversary !</li>
         <li>You have <span class="text-{{pyvac.user.rtt['state']}}"><b>{{pyvac.user.rtt['left']}} RTT</b></span> to use before end of year {{pyvac.user.rtt['year']}}</li>
         <li>You have <b>{{pyvac.user.cp['restant']['left']}} CP Restant</b> to use before 31/05/{{pyvac.user.cp['restant']['year']}}</li>
         <li>You have <b>{{pyvac.user.cp['acquis']['left']}} CP Acquis</b> to use before 31/05/{{pyvac.user.cp['acquis']['year']}}</li>
