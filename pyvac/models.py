@@ -14,6 +14,12 @@ from sqlalchemy import (Table, Column, ForeignKey, Enum,
 from sqlalchemy import or_, and_
 from sqlalchemy.orm import relationship, synonym
 
+import yaml
+try:
+    from yaml import CSafeLoader as YAMLLoader
+except ImportError:
+    from yaml import SafeLoader as YAMLLoader
+
 from .helpers.sqla import (Database, SessionFactory, ModelError,
                            create_engine as create_engine_base,
                            dispose_engine as dispose_engine_base
@@ -565,7 +571,7 @@ class User(Base):
         if allowed is None:
             return
 
-        starting_date = CPVacation.get_starting_date()
+        starting_date = allowed.get('starting_date')
         print 'starting_date', starting_date
         taken = self.get_cp_taken_year(session, starting_date)
 
@@ -673,20 +679,34 @@ class CPVacation(BaseVacation):
         today_start_month = today.replace(day=1)
         months = abs(relativedelta(starting_date, today_start_month).months)
 
+        base_restant = 0
+        # use a new conf or field for starting acquis/restant value based on a
+        # configuration file
+        users_base = {}
+        try:
+            with open('conf/users_base_cp.yaml') as fdesc:
+                conf = yaml.load(fdesc, YAMLLoader)
+                users_base = conf.get('users_base')
+                starting_date = conf.get('date')
+                starting_date = datetime.strptime(starting_date, '%d/%m/%Y')
+        except IOError:
+            pass
+
         cp_bonus = 0
         user = kwargs.get('user')
         if user:
             # add bonus CP based on arrival_date, 1 more per year each 5 years
             cp_bonus = int(math.floor(user.seniority / 5))
+            base_restant = users_base.get(user.login, 0)
 
         # coeff should be 2.08 per month until the 5th year
         # we use only 2 first decimals.
         coeff = float("{0:.2f}".format((25 + cp_bonus) / 12.))
-        # use a new conf or field for starting acquis/restant value based on a
-        # configuration file
+
         acquis = (months * coeff)
-        restant = 23.5
-        return {'acquis': acquis, 'restant': restant}
+        restant = base_restant
+        return {'acquis': acquis, 'restant': restant,
+                'starting_date': starting_date}
 
 
 class VacationType(Base):
