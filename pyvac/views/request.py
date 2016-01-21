@@ -10,7 +10,7 @@ from pyramid.httpexceptions import HTTPFound
 from pyramid.url import route_url
 from pyramid.settings import asbool
 
-from pyvac.models import Request, VacationType, User
+from pyvac.models import Request, VacationType, User, CPVacation
 # from pyvac.helpers.i18n import trans as _
 from pyvac.helpers.calendar import delFromCal
 from pyvac.helpers.ldap import LdapCache
@@ -625,7 +625,13 @@ class PoolHistory(View):
         start = datetime(2014, 5, 1)
         years = [item for item in reversed(range(start.year, today.year + 1))]
 
-        pool_history = User.get_rtt_history(self.session, user, year)
+        pool_history = {}
+        pool_history['RTT'] = User.get_rtt_history(self.session, user, year)
+        pool_history['CP'] = {}
+        history, restant = User.get_cp_history(self.session, user, year)
+        pool_history['CP']['history'] = history
+        pool_history['CP']['restant'] = restant
 
         return {'user': user, 'year': year, 'years': years,
-                'pool_history': pool_history}
+                'pool_history': pool_history,
+                'consume_cp': CPVacation.consume}
