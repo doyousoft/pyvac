@@ -563,6 +563,56 @@ class User(Base):
 
         return history
 
+    @classmethod
+    def get_cp_acquired_history(cls, acquired):
+        """ Get CP acquired history """
+        starting_date = CPVacation.get_starting_date()
+        starting_date = starting_date.replace(day=1)
+
+        return [{'date': starting_date + relativedelta(months=idx),
+                 'value': acquired['coeff']}
+                for idx, item in enumerate(xrange(acquired['months'] + 1))]
+
+    @classmethod
+    def get_cp_taken_history(cls, session, user, date):
+        """ Get CP taken history """
+        valid_status = ['PENDING', 'ACCEPTED_MANAGER', 'APPROVED_ADMIN']
+        entries = [req for req in user.requests
+                   if (req.vacation_type.name == u'CP')
+                   and (req.status in valid_status)
+                   and (req.date_from >= date)]
+
+        return [{'date': req.date_from, 'value': -req.days} for req in entries]
+
+    @classmethod
+    def get_cp_history(cls, session, user, year):
+        """
+        Get CP history for given user: taken + acquired, sorted by date
+        """
+        allowed = VacationType.by_name_country(session, name=u'CP',
+                                               country=user.country,
+                                               user=user)
+        if allowed is None:
+            return []
+
+        raw_acquired = cls.get_cp_acquired_history(allowed)
+        acquired = []
+        total = 0
+        for item in raw_acquired:
+            if item['date'] < allowed['starting_date']:
+                total += item['value']
+            else:
+                if total:
+                    item['value'] = total
+                    total = 0
+                acquired.append(item)
+        taken = cls.get_cp_taken_history(session, user,
+                                         allowed['starting_date'])
+
+        history = sorted(acquired + taken)
+
+        return history, allowed['restant']
+
     def get_cp_usage(self, session):
         """ Get CP usage for a user """
         allowed = VacationType.by_name_country(session, name=u'CP',
@@ -571,17 +621,12 @@ class User(Base):
         if allowed is None:
             return
 
-        starting_date = allowed.get('starting_date')
-        print 'starting_date', starting_date
+        starting_date = allowed['starting_date']
         taken = self.get_cp_taken_year(session, starting_date)
 
-        # first remove taken CP from Restant pool then from Acquis pool
-        exceed = 0
-        left_restant = allowed['restant'] - taken
-        if left_restant < 0:
-            exceed = abs(left_restant)
-            left_restant = 0
-        left_acquis = allowed['acquis'] - exceed
+        left_restant, left_acquis = CPVacation.consume(taken,
+                                                       allowed['restant'],
+                                                       allowed['acquis'])
 
         # must handle 2 pools: acquis and restant
         ret_acquis = {'allowed': allowed['acquis'],
@@ -654,6 +699,17 @@ class CPVacation(BaseVacation):
     name = u'CP'
 
     @classmethod
+    def consume(cls, taken, restant, acquis):
+        """ first remove taken CP from Restant pool then from Acquis pool """
+        exceed = 0
+        left_restant = restant - abs(taken)
+        if left_restant < 0:
+            exceed = abs(left_restant)
+            left_restant = 0
+        left_acquis = acquis - exceed
+        return left_restant, left_acquis
+
+    @classmethod
     def get_starting_date(cls, today=None):
         """ """
         today = today or datetime.now()
@@ -706,6 +762,7 @@ class CPVacation(BaseVacation):
         acquis = (months * coeff)
         restant = base_restant
         return {'acquis': acquis, 'restant': restant,
+                'coeff': coeff, 'months': months,
                 'starting_date': starting_date}
 
 
