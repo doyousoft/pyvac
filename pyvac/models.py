@@ -4,6 +4,7 @@ import re
 import logging
 import json
 import math
+import operator
 from datetime import datetime, timedelta
 
 from dateutil.relativedelta import relativedelta
@@ -28,7 +29,7 @@ from .helpers.sqla import (Database, SessionFactory, ModelError,
 from pyvac.helpers.ldap import LdapCache
 from pyvac.helpers.i18n import translate as _
 from pyvac.helpers.calendar import addToCal
-from pyvac.helpers.util import daterange
+from pyvac.helpers.util import daterange, extract_cn
 from pyvac.helpers.holiday import utcify
 
 log = logging.getLogger(__file__)
@@ -200,8 +201,11 @@ class User(Base):
             return
 
         ldap = LdapCache()
-        user_data = ldap.search_user_by_dn(self.dn)
-        return user_data['arrivalDate']
+        try:
+            user_data = ldap.search_user_by_dn(self.dn)
+            return user_data['arrivalDate']
+        except:
+            pass
 
     @property
     def seniority(self):
@@ -716,11 +720,29 @@ class CPVacation(BaseVacation):
         current_year = today.year
 
         if today >= datetime(current_year, 6, 1):
-            starting_date = datetime(current_year, 6, 1)
+            starting_date = datetime(current_year, 5, 31)
         else:
-            starting_date = datetime(current_year - 1, 6, 1)
+            starting_date = datetime(current_year - 1, 5, 31)
 
         return starting_date
+
+    @classmethod
+    def get_cycle_boundaries(cls, date):
+        """ """
+        if date >= datetime(date.year, 6, 1):
+            start = datetime(date.year, 5, 31)
+            end = datetime(date.year + 1, 5, 31)
+        else:
+            start = datetime(date.year - 1, 5, 31)
+            end = datetime(date.year, 5, 31)
+
+        return start, end
+
+    @classmethod
+    def first_cycle(cls, base_date, date):
+        """ """
+        start, end = cls.get_cycle_boundaries(base_date)
+        return start <= date <= end
 
     @classmethod
     def acquired(cls, **kwargs):
@@ -732,38 +754,57 @@ class CPVacation(BaseVacation):
         today = datetime.now()
         starting_date = cls.get_starting_date(today)
 
-        today_start_month = today.replace(day=1)
-        months = abs(relativedelta(starting_date, today_start_month).months)
+        # only use base restant configuration file for the year cycle
+        # on which we launched the feature, otherwise, compute the value
+        # dynamically, including the bonus CP
+        # restant = acquis from previous cycle
 
         base_restant = 0
-        # use a new conf or field for starting acquis/restant value based on a
+        base_date = None
+        # use a new conf or field for starting restant value based on a
         # configuration file
         users_base = {}
         try:
-            with open('conf/users_base_cp.yaml') as fdesc:
+            filename = 'conf/users_base_%s.yaml' % cls.name.lower()
+            with open(filename) as fdesc:
                 conf = yaml.load(fdesc, YAMLLoader)
                 users_base = conf.get('users_base')
-                starting_date = conf.get('date')
-                starting_date = datetime.strptime(starting_date, '%d/%m/%Y')
+                base_date = conf.get('date')
+                base_date = datetime.strptime(base_date, '%d/%m/%Y')
         except IOError:
+            log.error('Cannot load user base file %s for %s vacation' %
+                      (filename, cls.name))
             pass
 
+        delta = relativedelta(starting_date, today)
+        months = abs(delta.months)
+        years = abs(delta.years)
+
+        acquis = None
         cp_bonus = 0
         user = kwargs.get('user')
         if user:
             # add bonus CP based on arrival_date, 1 more per year each 5 years
-            cp_bonus = int(math.floor(user.seniority / 5))
+            # cp bonus are added on the last acquisition day, so 31/05
+            if years > 0:
+                cp_bonus = int(math.floor(user.seniority / 5))
             base_restant = users_base.get(user.login, 0)
 
-        # coeff should be 2.08 per month until the 5th year
-        # we use only 2 first decimals.
-        coeff = float("{0:.2f}".format((25 + cp_bonus) / 12.))
+        if not months and years:
+            months = 12
+            acquis = 25 + cp_bonus
 
-        acquis = (months * coeff)
+        # coeff should be 2.08 per month
+        # we use only 2 first decimals.
+        coeff = float("{0:.2f}".format(25 / 12.))
+
+        log.info('%s: using coeff %s * months %s + (bonus %s)' %
+                 (user.login, coeff, months, cp_bonus))
+        acquis = acquis or (months * coeff)
         restant = base_restant
         return {'acquis': acquis, 'restant': restant,
                 'coeff': coeff, 'months': months,
-                'starting_date': starting_date}
+                'base_date': base_date}
 
 
 class VacationType(Base):

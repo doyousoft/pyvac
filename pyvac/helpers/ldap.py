@@ -380,6 +380,22 @@ class LdapWrapper(object):
         # only return unique entries
         return sorted(managers)
 
+    def list_arrivals(self):
+        """ Retrieve users arrival dates """
+        # rebind with system dn
+        self._bind(self.system_DN, self.system_password)
+        # retrieve all users so we can extract OU
+        required = ['arrivalDate']
+        item = 'cn=*'
+        res = self._conn.search_s('c=fr,%s' % self._base, ldap.SCOPE_SUBTREE,
+                                  self._filter % item, required)
+        arrivals = {}
+        for USER_DN, entry in res:
+            arrival = entry.get('arrivalDate', [None])[0]
+            arrivals[USER_DN] = self._convert_date(arrival)
+        # only return unique entries
+        return arrivals
+
     def get_users_units(self):
         """ Retrieve ou for all users """
         # rebind with system dn

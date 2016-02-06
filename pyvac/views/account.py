@@ -33,10 +33,13 @@ class List(View):
 
         user_attr = {}
         users_teams = {}
+        users_arrivals = {}
         if use_ldap:
-            # synchronise user groups/roles
-            User.sync_ldap_info(self.session)
+            # # synchronise user groups/roles
+            # User.sync_ldap_info(self.session)
+
             ldap = LdapCache()
+
             user_attr = ldap.get_users_units()
             users_teams = {}
             for team, members in ldap.list_teams().iteritems():
